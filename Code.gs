@@ -30,18 +30,18 @@ function runDataExtraction() {
     const ui = SpreadsheetApp.getUi();
     const sourceSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Pastepad");
     if (!sourceSheet) throw new Error("Sheet 'Pastepad' not found.");
+    console.log("Source sheet 'Pastepad' found.");
 
     const data = sourceSheet.getDataRange().getValues();
     if (!data || data.length === 0) throw new Error("No data found in 'Pastepad'.");
+    console.log(`Fetched ${data.length} rows from 'Pastepad'.`);
 
-    // 🔁 Map of file names to their Google Sheet IDs
     const fileMap = {
       "REG-101": { fileId: "1Hb-agA100ZwuvPf9lAlHk-s5h5HG5fVWLePO7EYBzbY", sheetName: "Inventaire" },
       "REG-102 RRIBC": { fileId: "19Ew_W50zatGad97FCpfgzAptkSfrJExF3cnDjDY8ZEc", sheetName: "IBC Use and Clean" },
       // Add more mappings as needed
     };
 
-    // 🧠 State Tracking
     let currentFileName = null;
     let currentDataBlock = [];
     let skipNextRow = false;
@@ -63,17 +63,18 @@ function runDataExtraction() {
 
         currentFileName = secondCell;
         currentDataBlock = [];
-        skipNextRow = true; // 🚫 Skip the next row (header)
+        skipNextRow = true; // Skip the column header row after block start
+        console.log(`Started new data block for file: ${currentFileName}`);
         continue;
       }
 
-      // 🚫 Skip next row after block start
+      // Skip next row after block start
       if (skipNextRow) {
         skipNextRow = false;
         continue;
       }
 
-      // ✅ Only process content rows inside a block
+      // Only process content rows inside a block
       if (currentFileName && firstCell === '') {
         const rowData = data[i].slice(1); // exclude first column (A)
 
@@ -88,9 +89,10 @@ function runDataExtraction() {
     if (currentFileName && currentDataBlock.length > 0) {
       if (!fileDataMap[currentFileName]) fileDataMap[currentFileName] = [];
       fileDataMap[currentFileName].push(...currentDataBlock);
+      console.log(`Saved data block for file: ${currentFileName} with ${currentDataBlock.length} rows.`);
     }
 
-    // 📤 Push to destination files
+    // Push to destination files
     for (const [fileName, rows] of Object.entries(fileDataMap)) {
       const mapping = fileMap[fileName];
       if (!mapping || !mapping.fileId || !mapping.sheetName) {
@@ -102,16 +104,18 @@ function runDataExtraction() {
       const destinationSheet = destinationSpreadsheet.getSheetByName(mapping.sheetName);
 
       if (!destinationSheet) {
-        console.warn(`Sheet 'Inventaire' not found in file '${fileName}'. Skipping.`);
+        console.warn(`Sheet '${mapping.sheetName}' not found in file '${fileName}'. Skipping.`);
         continue;
       }
 
       const lastRow = destinationSheet.getLastRow();
+      console.log(`Appending ${rows.length} rows to '${mapping.sheetName}' in file '${fileName}'.`);
       destinationSheet.getRange(lastRow + 1, 1, rows.length, rows[0].length).setValues(rows);
     }
 
     ui.alert("Success", "Data has been appended to the destination files successfully.", ui.ButtonSet.OK);
-    
+    console.log("Data append operation completed for all destination files.");    
+
   } catch (error) {
     console.error("Error in runDataExtraction:", error);
     SpreadsheetApp.getUi().alert("Error", `An error occurred:\n${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
