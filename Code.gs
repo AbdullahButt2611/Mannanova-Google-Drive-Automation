@@ -45,45 +45,61 @@ function runDataExtraction() {
     let currentFileName = null;
     let currentDataBlock = [];
     let skipNextRow = false;
+    let blockColCount = 0;
+    let headerRow = [];
 
     const fileDataMap = {}; // { fileName: [ [row1], [row2] ] }
 
+    console.log("Data Length", data.length)
     for (let i = 0; i < data.length; i++) {
-      const firstCell = String(data[i][0]).trim().toLowerCase();
-      const secondCell = String(data[i][1]).trim();
+    const firstCell = String(data[i][0]).trim().toLowerCase();
+    const secondCell = String(data[i][1]).trim();
 
-      const isNewBlock = (firstCell === 'true' || firstCell === 'false');
+    const isNewBlock = (firstCell === 'true' || firstCell === 'false');
 
-      if (isNewBlock) {
-        // Save previous block
-        if (currentFileName && currentDataBlock.length > 0) {
-          if (!fileDataMap[currentFileName]) fileDataMap[currentFileName] = [];
-          fileDataMap[currentFileName].push(...currentDataBlock);
-        }
-
-        currentFileName = secondCell;
-        currentDataBlock = [];
-        skipNextRow = true; // Skip the column header row after block start
-        console.log(`Started new data block for file: ${currentFileName}`);
-        continue;
+    if (isNewBlock) {
+      // Save previous block
+      if (currentFileName && currentDataBlock.length > 0) {
+        if (!fileDataMap[currentFileName]) fileDataMap[currentFileName] = [];
+        fileDataMap[currentFileName].push(...currentDataBlock);
+        console.log(`Saved data block for file: ${currentFileName} with ${currentDataBlock.length} rows.`);
       }
 
-      // Skip next row after block start
-      if (skipNextRow) {
-        skipNextRow = false;
-        continue;
-      }
+      currentFileName = secondCell;
+      currentDataBlock = [];
+      skipNextRow = true; // Next row is header
+      blockColCount = 0;
+      headerRow = [];
+      console.log(`Started new data block for file: ${currentFileName}`);
+      continue;
+    }
 
-      // Only process content rows inside a block
-      if (currentFileName && firstCell === '') {
-        const rowData = data[i].slice(1); // exclude first column (A)
+    if (skipNextRow) {
+      headerRow = data[i].slice(1); // exclude first column (A)
+      blockColCount = headerRow.length;
+      skipNextRow = false;
+      console.log(`Header for block ${currentFileName}: ${JSON.stringify(headerRow)} (columns: ${blockColCount})`);
+      continue;
+    }
 
-        const hasEmptyCell = rowData.some(cell => String(cell).trim() === '');
-        if (!hasEmptyCell) {
-          currentDataBlock.push(rowData);
-        }
+    if (currentFileName && firstCell === '') {
+      const rowData = data[i].slice(1, 1 + blockColCount); // only take as many columns as header
+      const allEmpty = rowData.every(cell => String(cell).trim() === '');
+      if (!allEmpty) {
+        currentDataBlock.push(rowData);
+        console.log(`Added row to block ${currentFileName}: ${JSON.stringify(rowData)}`);
+      } else {
+        console.log(`Skipped completely empty row in block ${currentFileName}: ${JSON.stringify(rowData)}`);
       }
     }
+  }
+
+  // Save the last block after the loop
+  if (currentFileName && currentDataBlock.length > 0) {
+    if (!fileDataMap[currentFileName]) fileDataMap[currentFileName] = [];
+    fileDataMap[currentFileName].push(...currentDataBlock);
+    console.log(`Saved data block for file: ${currentFileName} with ${currentDataBlock.length} rows.`);
+  }
 
     // Save last block
     if (currentFileName && currentDataBlock.length > 0) {
@@ -108,10 +124,14 @@ function runDataExtraction() {
         continue;
       }
 
+      // Use the header length for this block
+      const colCount = rows.length > 0 ? rows[0].length : 0;
       const lastRow = destinationSheet.getLastRow();
-      console.log(`Appending ${rows.length} rows to '${mapping.sheetName}' in file '${fileName}'.`);
-      destinationSheet.getRange(lastRow + 1, 1, rows.length, rows[0].length).setValues(rows);
+      console.log(`Appending ${rows.length} rows to '${mapping.sheetName}' in file '${fileName}' (${colCount} columns).`);
+      destinationSheet.getRange(lastRow + 1, 1, rows.length, colCount).setValues(rows);
     }
+
+    console.log("File Data Map", fileDataMap)
 
     ui.alert("Success", "Data has been appended to the destination files successfully.", ui.ButtonSet.OK);
     console.log("Data append operation completed for all destination files.");    
