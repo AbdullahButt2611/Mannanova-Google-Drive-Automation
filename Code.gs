@@ -32,11 +32,12 @@ function runDataExtraction() {
     if (!sourceSheet) throw new Error("Sheet 'Pastepad' not found.");
 
     const data = sourceSheet.getDataRange().getValues();
-    if (!data || data.length === 1) throw new Error("No data found in 'Pastepad'.");
+    if (!data || data.length === 0) throw new Error("No data found in 'Pastepad'.");
 
     // 🔁 Map of file names to their Google Sheet IDs
     const fileMap = {
-      "REG-100": "1Hb-agA100ZwuvPf9lAlHk-s5h5HG5fVWLePO7EYBzbY",
+      "REG-101": { fileId: "1Hb-agA100ZwuvPf9lAlHk-s5h5HG5fVWLePO7EYBzbY", sheetName: "Inventaire" },
+      "REG-102 RRIBC": { fileId: "19Ew_W50zatGad97FCpfgzAptkSfrJExF3cnDjDY8ZEc", sheetName: "IBC Use and Clean" },
       // Add more mappings as needed
     };
 
@@ -91,14 +92,14 @@ function runDataExtraction() {
 
     // 📤 Push to destination files
     for (const [fileName, rows] of Object.entries(fileDataMap)) {
-      const fileId = fileMap[fileName];
-      if (!fileId) {
-        console.warn(`No file ID mapped for '${fileName}'. Skipping.`);
+      const mapping = fileMap[fileName];
+      if (!mapping || !mapping.fileId || !mapping.sheetName) {
+        console.warn(`Missing mapping info for '${fileName}'. Skipping.`);
         continue;
       }
 
-      const destinationSpreadsheet = SpreadsheetApp.openById(fileId);
-      const destinationSheet = destinationSpreadsheet.getSheetByName("Inventaire");
+      const destinationSpreadsheet = SpreadsheetApp.openById(mapping.fileId);
+      const destinationSheet = destinationSpreadsheet.getSheetByName(mapping.sheetName);
 
       if (!destinationSheet) {
         console.warn(`Sheet 'Inventaire' not found in file '${fileName}'. Skipping.`);
