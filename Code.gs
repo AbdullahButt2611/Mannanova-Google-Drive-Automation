@@ -45,9 +45,11 @@ function runDataExtraction() {
     let currentFileName = null;
     let currentDataBlock = [];
     let skipNextRow = false;
+    let currentBlockStartRow = null;
 
     const fileDataMap = {};  // { fileName: [ [row1], [row2] ] }
     const columnCountMap = {};  // { fileName: columnCount }
+    const blockRowMap = {};           // { fileName: rowIndex }
 
     for (let i = 0; i < data.length; i++) {
       const firstCell = String(data[i][0]).trim().toLowerCase();
@@ -64,6 +66,8 @@ function runDataExtraction() {
         }
 
         currentFileName = secondCell;
+        currentBlockStartRow = i + 1; // Google Sheets rows are 1-based
+        blockRowMap[currentFileName] = currentBlockStartRow;
         currentDataBlock = [];
         skipNextRow = true;
         continue;
@@ -127,6 +131,13 @@ function runDataExtraction() {
       const lastRow = destinationSheet.getLastRow();
       console.log(`Appending ${rows.length} rows to '${mapping.sheetName}' in file '${fileName}' (${colCount} columns).`);
       destinationSheet.getRange(lastRow + 1, 1, rows.length, colCount).setValues(rows);
+
+      // Update Pastepad block header to "true"
+      const blockRow = blockRowMap[fileName];
+      if (blockRow) {
+        sourceSheet.getRange(blockRow, 1).setValue("true");
+        console.log(`Marked block '${fileName}' as processed at row ${blockRow}`);
+      }
     }
 
     console.log("File Data Map", fileDataMap)
