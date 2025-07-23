@@ -40,7 +40,6 @@ function runDataExtraction() {
       "REG-101": { fileId: "1Hb-agA100ZwuvPf9lAlHk-s5h5HG5fVWLePO7EYBzbY", sheetName: "Inventaire" },
       "REG-102 RRIBC": { fileId: "19Ew_W50zatGad97FCpfgzAptkSfrJExF3cnDjDY8ZEc", sheetName: "IBC Use and Clean" },
       "REG-602 IBC Log and Inventory": { fileId: "16ONekxAeaADr9wyJ96aHOmaT7oRO89_9SPgH5_b9rUE", sheetName: "All IBCs - List" },
-      // Add more mappings as needed
     };
 
     let currentFileName = null;
