@@ -39,60 +39,59 @@ function runDataExtraction() {
     const fileMap = {
       "REG-101": { fileId: "1Hb-agA100ZwuvPf9lAlHk-s5h5HG5fVWLePO7EYBzbY", sheetName: "Inventaire" },
       "REG-102 RRIBC": { fileId: "19Ew_W50zatGad97FCpfgzAptkSfrJExF3cnDjDY8ZEc", sheetName: "IBC Use and Clean" },
+      "REG-602 IBC Log and Inventory": { fileId: "16ONekxAeaADr9wyJ96aHOmaT7oRO89_9SPgH5_b9rUE", sheetName: "All IBCs - List" },
       // Add more mappings as needed
     };
 
     let currentFileName = null;
     let currentDataBlock = [];
     let skipNextRow = false;
-    let blockColCount = 0;
-    let headerRow = [];
 
-    const fileDataMap = {}; // { fileName: [ [row1], [row2] ] }
+    const fileDataMap = {};  // { fileName: [ [row1], [row2] ] }
+    const columnCountMap = {};  // { fileName: columnCount }
 
-    console.log("Data Length", data.length)
     for (let i = 0; i < data.length; i++) {
-    const firstCell = String(data[i][0]).trim().toLowerCase();
-    const secondCell = String(data[i][1]).trim();
+      const firstCell = String(data[i][0]).trim().toLowerCase();
+      const secondCell = String(data[i][1]).trim();
 
-    const isNewBlock = (firstCell === 'true' || firstCell === 'false');
+      const isNewBlock = (firstCell === 'true' || firstCell === 'false');
 
-    if (isNewBlock) {
+      if (isNewBlock) {
       // Save previous block
-      if (currentFileName && currentDataBlock.length > 0) {
-        if (!fileDataMap[currentFileName]) fileDataMap[currentFileName] = [];
-        fileDataMap[currentFileName].push(...currentDataBlock);
-        console.log(`Saved data block for file: ${currentFileName} with ${currentDataBlock.length} rows.`);
+        if (currentFileName && currentDataBlock.length > 0) {
+          if (!fileDataMap[currentFileName]) fileDataMap[currentFileName] = [];
+          fileDataMap[currentFileName].push(...currentDataBlock);
+          console.log(`Saved data block for file: ${currentFileName} with ${currentDataBlock.length} rows.`);
+        }
+
+        currentFileName = secondCell;
+        currentDataBlock = [];
+        skipNextRow = true;
+        continue;
       }
 
-      currentFileName = secondCell;
-      currentDataBlock = [];
-      skipNextRow = true; // Next row is header
-      blockColCount = 0;
-      headerRow = [];
-      console.log(`Started new data block for file: ${currentFileName}`);
-      continue;
-    }
+      if (skipNextRow) {
+        const headerRow = data[i].slice(1);
+        const colCount = headerRow.filter(cell => String(cell).trim() !== "").length;
+        columnCountMap[currentFileName] = colCount;
+        skipNextRow = false;
+        console.log(`Header for block ${currentFileName}: ${JSON.stringify(headerRow)} (${colCount} columns)`);
+        continue;
+      }
 
-    if (skipNextRow) {
-      headerRow = data[i].slice(1); // exclude first column (A)
-      blockColCount = headerRow.length;
-      skipNextRow = false;
-      console.log(`Header for block ${currentFileName}: ${JSON.stringify(headerRow)} (columns: ${blockColCount})`);
-      continue;
-    }
+      if (currentFileName && firstCell === '') {
+        const colCount = columnCountMap[currentFileName] || 0;
+        const rowData = data[i].slice(1, 1 + colCount);
+        const hasEmpty = rowData.some(cell => String(cell).trim() === '');
 
-    if (currentFileName && firstCell === '') {
-      const rowData = data[i].slice(1, 1 + blockColCount); // only take as many columns as header
-      const allEmpty = rowData.every(cell => String(cell).trim() === '');
-      if (!allEmpty) {
-        currentDataBlock.push(rowData);
-        console.log(`Added row to block ${currentFileName}: ${JSON.stringify(rowData)}`);
-      } else {
-        console.log(`Skipped completely empty row in block ${currentFileName}: ${JSON.stringify(rowData)}`);
+        if (!hasEmpty) {
+          currentDataBlock.push(rowData);
+          console.log(`Added row to block ${currentFileName}: ${JSON.stringify(rowData)}`);
+        } else {
+          console.log(`Skipped row with empty cells in block ${currentFileName}: ${JSON.stringify(rowData)}`);
+        }
       }
     }
-  }
 
   // Save the last block after the loop
   if (currentFileName && currentDataBlock.length > 0) {
@@ -125,7 +124,7 @@ function runDataExtraction() {
       }
 
       // Use the header length for this block
-      const colCount = rows.length > 0 ? rows[0].length : 0;
+      const colCount = columnCountMap[fileName] || (rows.length > 0 ? rows[0].length : 0);
       const lastRow = destinationSheet.getLastRow();
       console.log(`Appending ${rows.length} rows to '${mapping.sheetName}' in file '${fileName}' (${colCount} columns).`);
       destinationSheet.getRange(lastRow + 1, 1, rows.length, colCount).setValues(rows);
