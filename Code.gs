@@ -135,7 +135,7 @@ function runDataExtraction() {
       // Update Pastepad block header to "true"
       const blockRow = blockRowMap[fileName];
       if (blockRow) {
-        sourceSheet.getRange(blockRow, 1).setValue("true");
+        sourceSheet.getRange(blockRow, 1).setValue(false);
         console.log(`Marked block '${fileName}' as processed at row ${blockRow}`);
       }
     }
