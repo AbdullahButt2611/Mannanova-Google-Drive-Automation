@@ -55,10 +55,9 @@ function runDataExtraction() {
       const firstCell = String(data[i][0]).trim().toLowerCase();
       const secondCell = String(data[i][1]).trim();
 
-      const isNewBlock = (firstCell === 'true' || firstCell === 'false');
-
-      if (isNewBlock) {
-      // Save previous block
+      // Start of a block only if checkbox is TRUE
+      if (firstCell === 'true') {
+        // Save previous block if exists
         if (currentFileName && currentDataBlock.length > 0) {
           if (!fileDataMap[currentFileName]) fileDataMap[currentFileName] = [];
           fileDataMap[currentFileName].push(...currentDataBlock);
@@ -66,13 +65,20 @@ function runDataExtraction() {
         }
 
         currentFileName = secondCell;
-        currentBlockStartRow = i + 1; // Google Sheets rows are 1-based
+        currentBlockStartRow = i + 1;
         blockRowMap[currentFileName] = currentBlockStartRow;
         currentDataBlock = [];
         skipNextRow = true;
         continue;
       }
 
+      // Skip blocks explicitly marked as false (just skip this row)
+      if (firstCell === 'false') {
+        console.log(`Skipping block '${secondCell}' as it is marked false.`);
+        continue;
+      }
+
+      // Handle header row (right after TRUE)
       if (skipNextRow) {
         const headerRow = data[i].slice(1);
         const colCount = headerRow.filter(cell => String(cell).trim() !== "").length;
@@ -82,6 +88,7 @@ function runDataExtraction() {
         continue;
       }
 
+      // Add data rows if current block is valid
       if (currentFileName && firstCell === '') {
         const colCount = columnCountMap[currentFileName] || 0;
         const rowData = data[i].slice(1, 1 + colCount);
@@ -96,18 +103,18 @@ function runDataExtraction() {
       }
     }
 
-  // Save the last block after the loop
-  if (currentFileName && currentDataBlock.length > 0) {
-    if (!fileDataMap[currentFileName]) fileDataMap[currentFileName] = [];
-    fileDataMap[currentFileName].push(...currentDataBlock);
-    console.log(`Saved data block for file: ${currentFileName} with ${currentDataBlock.length} rows.`);
-  }
-
     // Save last block
     if (currentFileName && currentDataBlock.length > 0) {
       if (!fileDataMap[currentFileName]) fileDataMap[currentFileName] = [];
       fileDataMap[currentFileName].push(...currentDataBlock);
       console.log(`Saved data block for file: ${currentFileName} with ${currentDataBlock.length} rows.`);
+    }
+
+    // After all blocks are processed, check if there is any data to push
+    if (Object.keys(fileDataMap).length === 0) {
+      ui.alert("Notice", "This file is either already parsed or there is nothing new to copy.", ui.ButtonSet.OK);
+      console.log("No new data found to copy.");
+      return;
     }
 
     // Push to destination files
