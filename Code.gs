@@ -57,6 +57,14 @@ function runDataExtraction() {
 
       // Start of a block only if checkbox is TRUE
       if (firstCell === 'true') {
+        const statusColIndex = 2;  // Column C (0-indexed: A=0, B=1, C=2)
+        const statusCellValue = String(data[i][statusColIndex]).trim().toLowerCase();
+
+        if (statusCellValue === 'processed') {
+          console.log(`Skipping block '${secondCell}' — already marked as processed.`);
+          continue;
+        }
+
         // Save previous block if exists
         if (currentFileName && currentDataBlock.length > 0) {
           if (!fileDataMap[currentFileName]) fileDataMap[currentFileName] = [];
@@ -206,10 +214,15 @@ function runDataExtraction() {
         }
       }
 
-      // Update Pastepad block header to "true"
+      // Update sheet to maintain the track of the processed block
       const blockRow = blockRowMap[fileName];
       if (blockRow) {
-        sourceSheet.getRange(blockRow, 1).setValue(false);
+        const statusCol = 3;     // Column C (e.g., for status like "Processed")
+        const timestampCol = 4;  // Column D (e.g., for timestamp)
+
+        sourceSheet.getRange(blockRow, statusCol).setValue("Processed");
+        sourceSheet.getRange(blockRow, timestampCol).setValue(new Date());
+
         console.log(`Marked block '${fileName}' as processed at row ${blockRow}`);
       }
     }
