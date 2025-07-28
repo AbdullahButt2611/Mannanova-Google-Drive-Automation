@@ -139,6 +139,73 @@ function runDataExtraction() {
       console.log(`Appending ${rows.length} rows to '${mapping.sheetName}' in file '${fileName}' (${colCount} columns).`);
       destinationSheet.getRange(lastRow + 1, 1, rows.length, colCount).setValues(rows);
 
+      // Skip formula copy for REG-102 RRIBC to avoid row duplication
+      if (fileName !== "REG-102 RRIBC") {
+        // Copy formulas column-wise instead of row-wise
+        const totalCols = destinationSheet.getLastColumn();
+        if (totalCols > colCount) {
+          const formulaCols = totalCols - colCount;
+
+          for (let col = colCount + 1; col <= totalCols; col++) {
+            // Find a non-empty formula cell in this column
+            const columnFormulas = destinationSheet.getRange(1, col, lastRow).getFormulas();
+            let baseFormula = null;
+
+            for (let row = lastRow - 1; row >= 0; row--) {
+              const f = columnFormulas[row][0];
+              if (f && f.trim() !== '') {
+                baseFormula = f;
+                break;
+              }
+            }
+
+            if (baseFormula) {
+              // Prepare an array to apply the formula to all new rows
+              const formulaArray = Array(rows.length).fill([baseFormula]);
+              destinationSheet
+                .getRange(lastRow + 1, col, rows.length, 1)
+                .setFormulas(formulaArray);
+              console.log(`Applied formula in column ${col}: ${baseFormula}`);
+            } else {
+              console.warn(`No formula found in column ${col} to copy.`);
+            }
+          }
+        }
+      } else {
+        // Custom logic for REG-102: copy only basic formulas, skip ARRAYFORMULA or complex ones
+        const totalCols = destinationSheet.getLastColumn();
+        if (totalCols > colCount) {
+          for (let col = colCount + 1; col <= totalCols; col++) {
+            const columnFormulas = destinationSheet.getRange(1, col, lastRow).getFormulas();
+            let baseFormula = null;
+
+            for (let row = lastRow - 1; row >= 0; row--) {
+              const f = columnFormulas[row][0];
+              if (
+                f &&
+                f.trim() !== "" &&
+                !f.toLowerCase().includes("arrayformula") &&
+                !f.toLowerCase().includes("query") &&
+                !f.toLowerCase().includes("filter")
+              ) {
+                baseFormula = f;
+                break;
+              }
+            }
+
+            if (baseFormula) {
+              const formulaArray = Array(rows.length).fill([baseFormula]);
+              destinationSheet
+                .getRange(lastRow + 1, col, rows.length, 1)
+                .setFormulas(formulaArray);
+              console.log(`[REG-102] Applied basic formula in col ${col}: ${baseFormula}`);
+            } else {
+              console.log(`[REG-102] Skipped formula in col ${col} (complex or empty).`);
+            }
+          }
+        }
+      }
+
       // Update Pastepad block header to "true"
       const blockRow = blockRowMap[fileName];
       if (blockRow) {
