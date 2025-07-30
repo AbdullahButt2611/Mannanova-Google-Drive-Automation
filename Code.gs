@@ -1,10 +1,3 @@
-function freezeOutput(){
-
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("FOR-301 - 2023 Brewsheet");
-  var range = sheet.getActiveRange();   
-  range.copyTo(range, {contentsOnly:true});
-}
-
 /**
  * Creates custom menu when spreadsheet opens
  * This function is automatically triggered when the spreadsheet is opened
@@ -44,20 +37,10 @@ function runDataExtraction() {
     console.log(`Fetched ${data.length} rows from 'Pastepad'.`);
 
     const fileMap = {
-      "REG-101": {
-        fileId: "1ubAACUpl7589dS1X6QfSdFxgq85f9CVFZUijFK-aOKI",
-        sheetName: "Inventaire",
-      },
-      "REG-102 RRIBC": {
-        fileId: "1H34COsxAwAZ8o6yLE16_kXSWg0CUnzZxSQKVFbB9AJA",
-        sheetName: "IBC Use and Clean",
-      },
-      "REG-602 IBC Log and Inventory": {
-        fileId: "1a4vGZ3eMDUdqN5WIkA6YisaNxJdIFziKVh_Hkdz1nr4",
-        sheetName: "All IBCs - List",
-      },
+      "REG-101": { fileId: "1Hb-agA100ZwuvPf9lAlHk-s5h5HG5fVWLePO7EYBzbY", sheetName: "Inventaire" },
+      "REG-102 RRIBC": { fileId: "19Ew_W50zatGad97FCpfgzAptkSfrJExF3cnDjDY8ZEc", sheetName: "IBC Use and Clean" },
+      "REG-602 IBC Log and Inventory": { fileId: "16ONekxAeaADr9wyJ96aHOmaT7oRO89_9SPgH5_b9rUE", sheetName: "All IBCs - List" },
     };
-
 
     let currentFileName = null;
     let currentDataBlock = [];
@@ -164,43 +147,28 @@ function runDataExtraction() {
       console.log(`Appending ${rows.length} rows to '${mapping.sheetName}' in file '${fileName}' (${colCount} columns).`);
       destinationSheet.getRange(lastRow + 1, 1, rows.length, colCount).setValues(rows);
 
-      // Skip formula copy for REG-102 RRIBC to avoid row duplication
-      if (fileName !== "REG-102 RRIBC") {
-        copyFormulasEfficiently(destinationSheet, lastRow + 1, rows.length, colCount);
-      } else {
-        // Custom logic for REG-102: copy only basic formulas, skip ARRAYFORMULA or complex ones
-        const totalCols = destinationSheet.getLastColumn();
-        if (totalCols > colCount) {
-          for (let col = colCount + 1; col <= totalCols; col++) {
-            const columnFormulas = destinationSheet.getRange(1, col, lastRow).getFormulas();
-            let baseFormula = null;
+      const templateFormulas = [];
+      const lastRowFormulas = destinationSheet.getRange(lastRow, 1, 1, destinationSheet.getLastColumn()).getFormulas()[0];
 
-            for (let row = lastRow - 1; row >= 0; row--) {
-              const f = columnFormulas[row][0];
-              if (
-                f &&
-                f.trim() !== "" &&
-                !f.toLowerCase().includes("arrayformula") &&
-                !f.toLowerCase().includes("query") &&
-                !f.toLowerCase().includes("filter")
-              ) {
-                baseFormula = f;
-                break;
-              }
-            }
+      for (let i = 0; i < lastRowFormulas.length; i++) {
+        const formula = lastRowFormulas[i];
+        if (formula) {
+          let pattern = formula;
 
-            if (baseFormula) {
-              const formulaArray = Array(rows.length).fill([baseFormula]);
-              destinationSheet
-                .getRange(lastRow + 1, col, rows.length, 1)
-                .setFormulas(formulaArray);
-              console.log(`[REG-102] Applied basic formula in col ${col}: ${baseFormula}`);
-            } else {
-              console.log(`[REG-102] Skipped formula in col ${col} (complex or empty).`);
-            }
-          }
+          // Replace direct references like A2862, B2862, etc.
+          pattern = pattern.replace(new RegExp(`([A-Z]+)${lastRow}`, 'g'), '$1{row}');
+
+          // Replace ranges like $B$2:$B2861
+          pattern = pattern.replace(new RegExp(`(\\$[A-Z]+\\$2:\\$[A-Z]+)${lastRow - 1}`, 'g'), '$1{rowMinus1}');
+
+          templateFormulas.push(pattern);
+        } else {
+          templateFormulas.push(null);
         }
       }
+
+      // Apply updated formulas with correct row numbers
+      applyDynamicFormulas(destinationSheet, lastRow + 1, rows.length, templateFormulas, lastRow);
 
       // Update sheet to maintain the track of the processed block
       const blockRow = blockRowMap[fileName];
@@ -226,43 +194,19 @@ function runDataExtraction() {
   }
 }
 
+function applyDynamicFormulas(sheet, startRow, numRows, formulaTemplates, baseRow) {
+  for (let i = 0; i < numRows; i++) {
+    const row = startRow + i;
+    const rowMinus1 = row - 1;
 
-function copyFormulasEfficiently(sheet, startRow, numRows, startCol) {
-  const totalCols = sheet.getLastColumn();
-  const endCol = totalCols;
-
-  if (startCol >= endCol) return;
-
-  const formulaRowsToCheck = 10;
-  const baseFormulas = [];
-
-  const lastDataRow = startRow - 1;
-  const formulaRange = sheet.getRange(
-    Math.max(1, lastDataRow - formulaRowsToCheck + 1),
-    startCol + 1,
-    Math.min(formulaRowsToCheck, lastDataRow),
-    endCol - startCol
-  );
-  const formulas = formulaRange.getFormulas();
-
-  for (let col = 0; col < formulas[0].length; col++) {
-    let baseFormula = null;
-    for (let row = formulas.length - 1; row >= 0; row--) {
-      const f = formulas[row][col];
-      if (f && f.trim() !== '') {
-        baseFormula = f;
-        break;
+    for (let col = 0; col < formulaTemplates.length; col++) {
+      const template = formulaTemplates[col];
+      if (template) {
+        let formula = template
+          .replaceAll('{row}', row)
+          .replaceAll('{rowMinus1}', rowMinus1);
+        sheet.getRange(row, col + 1).setFormula(formula);
       }
-    }
-    baseFormulas.push(baseFormula);
-  }
-
-  // Prepare formula array to apply to new rows
-  for (let col = 0; col < baseFormulas.length; col++) {
-    const formula = baseFormulas[col];
-    if (formula) {
-      const formulaArray = Array(numRows).fill([formula]);
-      sheet.getRange(startRow, startCol + 1 + col, numRows, 1).setFormulas(formulaArray);
     }
   }
 }
