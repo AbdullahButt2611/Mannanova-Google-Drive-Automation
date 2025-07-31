@@ -146,6 +146,13 @@ function runDataExtraction() {
       const lastRow = destinationSheet.getLastRow();
       console.log(`Appending ${rows.length} rows to '${mapping.sheetName}' in file '${fileName}' (${colCount} columns).`);
       destinationSheet.getRange(lastRow + 1, 1, rows.length, colCount).setValues(rows);
+      
+      // Copy formatting logic 
+      const sourceRange = destinationSheet.getRange(lastRow, 1, 1, destinationSheet.getLastColumn());
+      const targetRange = destinationSheet.getRange(lastRow + 1, 1, rows.length, destinationSheet.getLastColumn());
+      for (let i = 0; i < rows.length; i++) {
+        sourceRange.copyTo(destinationSheet.getRange(lastRow + 1 + i, 1, 1, destinationSheet.getLastColumn()), { formatOnly: true });
+      }
 
       const templateFormulas = [];
       const lastRowFormulas = destinationSheet.getRange(lastRow, 1, 1, destinationSheet.getLastColumn()).getFormulas()[0];
