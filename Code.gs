@@ -36,6 +36,8 @@ function runDataExtraction() {
     if (!data || data.length === 0) throw new Error("No data found in 'Pastepad'.");
     console.log(`Fetched ${data.length} rows from 'Pastepad'.`);
 
+    let reg101Initials = null; // Store initials for REG-101
+
     const fileMap = {
       "REG-101": { fileId: "1Hb-agA100ZwuvPf9lAlHk-s5h5HG5fVWLePO7EYBzbY", sheetName: "Inventaire" },
       "REG-102 RRIBC": { fileId: "19Ew_W50zatGad97FCpfgzAptkSfrJExF3cnDjDY8ZEc", sheetName: "IBC Use and Clean" },
@@ -63,6 +65,13 @@ function runDataExtraction() {
         if (statusCellValue === 'processed') {
           console.log(`Skipping block '${secondCell}' — already marked as processed.`);
           continue;
+        }
+
+        // Check if this is REG-101 and capture initials from column E (index 4)
+        if (secondCell === 'REG-101' && i > 0) {
+          // Get initials from the previous row, column E (index 4)
+          reg101Initials = String(data[i - 1][4]).trim();
+          console.log(`Captured initials for REG-101: ${reg101Initials}`);
         }
 
         // Save previous block if exists
@@ -105,8 +114,6 @@ function runDataExtraction() {
         if (!hasEmpty) {
           currentDataBlock.push(rowData);
           console.log(`Added row to block ${currentFileName}: ${JSON.stringify(rowData)}`);
-        } else {
-          console.log(`Skipped row with empty cells in block ${currentFileName}: ${JSON.stringify(rowData)}`);
         }
       }
     }
@@ -141,11 +148,29 @@ function runDataExtraction() {
         continue;
       }
 
-      // Use the header length for this block
-      const colCount = columnCountMap[fileName] || (rows.length > 0 ? rows[0].length : 0);
+      // Section - Column Count Logic
+      // Determine actual column count from the data rows
+      const actualColCount = rows.length > 0 ? rows[0].length : columnCountMap[fileName] || 0;
+
       const lastRow = destinationSheet.getLastRow();
-      console.log(`Appending ${rows.length} rows to '${mapping.sheetName}' in file '${fileName}' (${colCount} columns).`);
-      destinationSheet.getRange(lastRow + 1, 1, rows.length, colCount).setValues(rows);
+      console.log(`Appending ${rows.length} rows to '${mapping.sheetName}' in file '${fileName}' (${actualColCount} columns).`);
+
+      // For REG-101, write data without initials (only the original 6 columns)
+      if (fileName === 'REG-101' && reg101Initials) {
+        // Extract only the first 6 columns (without the gap and initials)
+        const dataWithoutInitials = rows.map(row => row.slice(0, 6));
+        destinationSheet.getRange(lastRow + 1, 1, rows.length, 6).setValues(dataWithoutInitials);
+        
+        // Explicitly write initials to column K
+        const initialsColumn = 11; // Column K (A=1, B=2, ... K=11)
+        for (let i = 0; i < rows.length; i++) {
+          destinationSheet.getRange(lastRow + 1 + i, initialsColumn).setValue(reg101Initials);
+        }
+        console.log(`Set initials '${reg101Initials}' in column K for ${rows.length} rows`);
+      } else {
+        // For other files, write normally
+        destinationSheet.getRange(lastRow + 1, 1, rows.length, actualColCount).setValues(rows);
+      }
       
       // Copy formatting logic 
       const sourceRange = destinationSheet.getRange(lastRow, 1, 1, destinationSheet.getLastColumn());
