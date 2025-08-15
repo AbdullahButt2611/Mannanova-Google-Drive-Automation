@@ -37,6 +37,7 @@ function runDataExtraction() {
     console.log(`Fetched ${data.length} rows from 'Pastepad'.`);
 
     let reg101Initials = null; // Store initials for REG-101
+    let reg102Dates = []; // Store dates for each row of REG-102
 
     const fileMap = {
       "REG-101": { fileId: "1Hb-agA100ZwuvPf9lAlHk-s5h5HG5fVWLePO7EYBzbY", sheetName: "Inventaire" },
@@ -86,6 +87,13 @@ function runDataExtraction() {
         blockRowMap[currentFileName] = currentBlockStartRow;
         currentDataBlock = [];
         skipNextRow = true;
+
+        // Reset REG-102 dates when starting a new block
+        if (secondCell === 'REG-102 RRIBC') {
+          reg102Dates = [];
+          console.log('Reset dates array for REG-102 RRIBC');
+        }
+
         continue;
       }
 
@@ -98,7 +106,18 @@ function runDataExtraction() {
       // Handle header row (right after TRUE)
       if (skipNextRow) {
         const headerRow = data[i].slice(1);
-        const colCount = headerRow.filter(cell => String(cell).trim() !== "").length;
+        let colCount = headerRow.filter(cell => String(cell).trim() !== "").length;
+        
+        // For REG-102, exclude the Date column from main column count
+        if (currentFileName === 'REG-102 RRIBC') {
+          // Assuming Date is the last column in the header
+          const dateColumnIndex = colCount - 1;
+          if (headerRow[dateColumnIndex] && String(headerRow[dateColumnIndex]).trim().toLowerCase() === 'date') {
+            colCount = colCount - 1; // Exclude Date column from main data
+            console.log(`REG-102 RRIBC: Found Date column at index ${dateColumnIndex}, adjusted column count to ${colCount}`);
+          }
+        }
+        
         columnCountMap[currentFileName] = colCount;
         skipNextRow = false;
         console.log(`Header for block ${currentFileName}: ${JSON.stringify(headerRow)} (${colCount} columns)`);
@@ -109,11 +128,27 @@ function runDataExtraction() {
       if (currentFileName && firstCell === '') {
         const colCount = columnCountMap[currentFileName] || 0;
         const rowData = data[i].slice(1, 1 + colCount);
-        const hasEmpty = rowData.some(cell => String(cell).trim() === '');
-
-        if (!hasEmpty) {
-          currentDataBlock.push(rowData);
-          console.log(`Added row to block ${currentFileName}: ${JSON.stringify(rowData)}`);
+        
+        // For REG-102, also capture the date from the next column
+        if (currentFileName === 'REG-102 RRIBC') {
+          const dateValue = data[i][1 + colCount]; // Date is after the main columns
+          const hasEmpty = rowData.some(cell => String(cell).trim() === '');
+          
+          if (!hasEmpty) {
+            currentDataBlock.push(rowData);
+            reg102Dates.push(dateValue); // Store the date for this row
+            console.log(`Added row to REG-102 with date: ${JSON.stringify(rowData)}, Date: ${dateValue}`);
+          } else {
+            console.log(`Skipped row with empty cells in block ${currentFileName}: ${JSON.stringify(rowData)}`);
+          }
+        } else {
+          const hasEmpty = rowData.some(cell => String(cell).trim() === '');
+          if (!hasEmpty) {
+            currentDataBlock.push(rowData);
+            console.log(`Added row to block ${currentFileName}: ${JSON.stringify(rowData)}`);
+          } else {
+            console.log(`Skipped row with empty cells in block ${currentFileName}: ${JSON.stringify(rowData)}`);
+          }
         }
       }
     }
@@ -167,8 +202,22 @@ function runDataExtraction() {
           destinationSheet.getRange(lastRow + 1 + i, initialsColumn).setValue(reg101Initials);
         }
         console.log(`Set initials '${reg101Initials}' in column K for ${rows.length} rows`);
-      } else {
-        // For other files, write normally
+      } 
+      // For REG-102, write data and add dates to column H
+      else if (fileName === 'REG-102 RRIBC' && reg102Dates.length > 0) {
+        destinationSheet.getRange(lastRow + 1, 1, rows.length, actualColCount).setValues(rows);
+        
+        // Explicitly write dates to column H
+        const dateColumn = 8; // Column H (A=1, B=2, ... H=8)
+        for (let i = 0; i < reg102Dates.length && i < rows.length; i++) {
+          if (reg102Dates[i]) {
+            destinationSheet.getRange(lastRow + 1 + i, dateColumn).setValue(reg102Dates[i]);
+          }
+        }
+        console.log(`Set dates in column H for ${reg102Dates.length} rows in REG-102 RRIBC`);
+      } 
+      // For other files, write normally
+      else {
         destinationSheet.getRange(lastRow + 1, 1, rows.length, actualColCount).setValues(rows);
       }
       
