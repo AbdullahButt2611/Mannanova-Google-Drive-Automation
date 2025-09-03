@@ -207,14 +207,21 @@ function runDataExtraction() {
       else if (fileName === 'REG-102 RRIBC' && reg102Dates.length > 0) {
         destinationSheet.getRange(lastRow + 1, 1, rows.length, actualColCount).setValues(rows);
         
-        // Explicitly write dates to column H
-        const dateColumn = 8; // Column H (A=1, B=2, ... H=8)
+        const dateColumn = 8;      // Column H (Date)
+        const initialsColumn = 9;  // Column I (Initials)
+
         for (let i = 0; i < reg102Dates.length && i < rows.length; i++) {
+          // Write Date
           if (reg102Dates[i]) {
             destinationSheet.getRange(lastRow + 1 + i, dateColumn).setValue(reg102Dates[i]);
           }
+          // Write Initials (copied same way from Pastepad like in REG-101)
+          if (reg101Initials) {
+            destinationSheet.getRange(lastRow + 1 + i, initialsColumn).setValue(reg101Initials);
+          }
         }
-        console.log(`Set dates in column H for ${reg102Dates.length} rows in REG-102 RRIBC`);
+
+        console.log(`Set dates in column H and initials '${reg101Initials}' in column I for ${reg102Dates.length} rows in REG-102 RRIBC`);
       } 
       // For other files, write normally
       else {
