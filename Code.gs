@@ -192,17 +192,28 @@ function runDataExtraction() {
 
       // For REG-101, write data without initials (only the original 6 columns)
       if (fileName === 'REG-101' && reg101Initials) {
-        // Extract only the first 6 columns (without the gap and initials)
-        const dataWithoutInitials = rows.map(row => row.slice(0, 6));
-        destinationSheet.getRange(lastRow + 1, 1, rows.length, 6).setValues(dataWithoutInitials);
-        
-        // Explicitly write initials to column K
-        const initialsColumn = 11; // Column K (A=1, B=2, ... K=11)
-        for (let i = 0; i < rows.length; i++) {
-          destinationSheet.getRange(lastRow + 1 + i, initialsColumn).setValue(reg101Initials);
-        }
-        console.log(`Set initials '${reg101Initials}' in column K for ${rows.length} rows`);
-      } 
+        // rows structure for REG-101 is:
+        // [Activity, Product Name, Date, Qty, Lot #, Lot Prod, Depleted?] -> 7 cols
+        const baseCols = 6; // write A..F only
+        const dataAtoF = rows.map(r => r.slice(0, baseCols));
+        destinationSheet.getRange(lastRow + 1, 1, dataAtoF.length, baseCols).setValues(dataAtoF);
+
+        // Initials -> Column K
+        const initialsVals = Array(rows.length).fill([reg101Initials]);
+        destinationSheet.getRange(lastRow + 1, 11, rows.length, 1).setValues(initialsVals);
+
+        // Depleted? is the 7th element in each row (index 6)
+        // Normalize to true/false and write to Column M
+        const depletedVals = rows.map(r => {
+          const v = r[6];
+          const b = (typeof v === 'boolean') ? v : String(v).trim().toUpperCase() === 'TRUE';
+          return [b];
+        });
+        const depRange = destinationSheet.getRange(lastRow + 1, 13, rows.length, 1);
+        depRange.setValues(depletedVals);
+        // We'll (re)insert checkboxes *after* the copy-formatting step below.
+        console.log(`Wrote A..F, initials(K), and depleted(M) for ${rows.length} REG-101 rows.`);
+      }
       // For REG-102, write data and add dates to column H
       else if (fileName === 'REG-102 RRIBC' && reg102Dates.length > 0) {
         destinationSheet.getRange(lastRow + 1, 1, rows.length, actualColCount).setValues(rows);
@@ -233,6 +244,14 @@ function runDataExtraction() {
       const targetRange = destinationSheet.getRange(lastRow + 1, 1, rows.length, destinationSheet.getLastColumn());
       for (let i = 0; i < rows.length; i++) {
         sourceRange.copyTo(destinationSheet.getRange(lastRow + 1 + i, 1, 1, destinationSheet.getLastColumn()), { formatOnly: true });
+      }
+
+      // Re-apply checkboxes for Depleted column in REG-101
+      if (fileName === 'REG-101') {
+        const depletedColumn = 13; // Column M
+        destinationSheet
+          .getRange(lastRow + 1, depletedColumn, rows.length, 1)
+          .insertCheckboxes();
       }
 
       const templateFormulas = [];
