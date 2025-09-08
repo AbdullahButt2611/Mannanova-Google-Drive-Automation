@@ -1,5 +1,7 @@
 # Mannanova Google Drive Automation
 
+<img src="Mannanova Thumbnail.png" alt="Mannanova Google Drive Automation" />
+
 This repository contains the complete Google Apps Script code used to **automate data transfer from a source spreadsheet to multiple destination spreadsheets**. It is built for Mannanova's internal operations to streamline and error-proof their data handling workflows.
 
 
@@ -33,6 +35,8 @@ This script is designed for teams that:
 
 
 ## 🚀 How It Works
+
+<img src="Mannanova Workflow.png" alt="How it Works" />
 
 1. **Setup**
 
